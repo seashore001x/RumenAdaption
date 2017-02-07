@@ -1,14 +1,18 @@
-library(dplyr)
-library(lme4)
-library(lmerTest)
-library(multcomp)
+library('dplyr')
+library('lme4')
+library('lmerTest')
+library('multcomp')
+library('agricolae')
 source('R_function/summarySE.R')
 source('R_function/gerrorbar.R')
 
+# Fermentation: Rumen fermentation parameters
+# NutrientIntake: Animal nutrient intake
+# Digestiblity: Animal digestibility
 # import fermentation parameters, nutrient intake and nutrient digestibility
-Fermentation = read.csv(file.choose())
-NutrientIntake = read.csv(file.choose(), colClasses = c(rep(c('factor', 'numeric'), each = 4), 'numeric'))
-Digestibility = read.csv(file.choose(), colClasses = c(rep(c('factor', 'numeric'), each = 4), 'numeric'))
+Fermentation <- read.csv(file.choose())
+NutrientIntake <- read.csv(file.choose(), colClasses = c(rep(c('factor', 'numeric'), each = 4), 'numeric'))
+Digestibility <- read.csv(file.choose(), colClasses = c(rep(c('factor', 'numeric'), each = 4), 'numeric'))
 
 
 # calculat the anova of NutrientIntake and digestbility using linear mixed effect model
@@ -64,19 +68,29 @@ for (i in 1:length(FermentationParameter)){
 }
 
 
-# multicomparison between different time points
-FermentationParameter_ACA = FermentationParameter[FermentationParameter$Sequence == 'ACA',]
-FermentationParameter_CAC = FermentationParameter[FermentationParameter$Sequence == 'CAC',]
+# we seperat the data according to two sequeneces, so we are able to do multicompasion between different time points within each sequence
+Fermentation_ACA = Fermentation[Fermentation$Sequence == 'ACA',]
+Fermentation_CAC = Fermentation[Fermentation$Sequence == 'CAC',]
+Fermentation_ACA$Day = as.factor(Fermentation_ACA$Day)    #set days as factors
+Fermentation_CAC$Day = as.factor(Fermentation_CAC$Day)
 
-# initialize parameters to store the posthoc result
-FermentationParameter_CAC_posthoc = list()
-FermentationParameter_ACA_posthoc = list()
+# initialize parameters to store the ANOVA result and post hoc tablet
+Fermentation_ACA_anova = list()
+Fermentation_CAC_anova = list()
+Fermentation_ACA_posthoc = list()
+Fermentation_CAC_posthoc = list()
 
+# do calculation
 for (i in 1:length(FermentationParameter)){
-
   FermentationParameter_Index = FermentationParameter[i]
-
-  FermentationParameter_ACA_posthoc[FermentationParameter_Index] = TukeyHSD(aov(FermentationParameter_Index~Day, data = FermentationParameter_ACA))
-  FermentationParameter_CAC_posthoc[FermentationParameter_Index] = TukeyHSD(aov(FermentationParameter_Index~Day, data = FermentationParameter_CAC))
+  formula = as.formula(paste(FermentationParameter_Index, '~ Day'))
+  
+  Fermentation_ACA_anova[[FermentationParameter_Index]] <- aov(formula, data = Fermentation_ACA)
+  Fermentation_ACA_posthoc[[FermentationParameter_Index]] <- HSD.test(y = Fermentation_ACA_anova[[FermentationParameter_Index]], trt = 'Day', group = T)$groups
+  
+  Fermentation_CAC_anova[[FermentationParameter_Index]] <- aov(formula, data = Fermentation_CAC)
+  Fermentation_CAC_posthoc[[FermentationParameter_Index]] <- HSD.test(y = Fermentation_CAC_anova[[FermentationParameter_Index]], trt = 'Day', group = T)$groups
 }
+
+
 

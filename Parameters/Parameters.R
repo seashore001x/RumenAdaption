@@ -1,96 +1,118 @@
 library('dplyr')
-library('lme4')
-library('lmerTest')
-library('multcomp')
 library('agricolae')
-source('R_function/summarySE.R')
-source('R_function/gerrorbar.R')
+library('ggplot2')
+library('gridExtra')
+source('../R_function/summarySE.R')
+source('../R_function/gerrorbar.R')
 
-# Fermentation: Rumen fermentation parameters
-# NutrientIntake: Animal nutrient intake
-# Digestiblity: Animal digestibility
+# ferment: Rumen fermentation parameters
+# intake: Animal nutrients intake
+# digest: Animal digestibility
 # import fermentation parameters, nutrient intake and nutrient digestibility
-Fermentation <- read.csv(file.choose())
-NutrientIntake <- read.csv(file.choose(), colClasses = c(rep(c('factor', 'numeric'), each = 4), 'numeric'))
-Digestibility <- read.csv(file.choose(), colClasses = c(rep(c('factor', 'numeric'), each = 4), 'numeric'))
+
+# days and pdays were left as numeric for easier plotting
+ferment <- read.csv('Parameters/para.csv')
+ferment$Subject = as.factor(ferment$Subject)
+# set subject, period, diet, group as factors; DM, CP, NDF, ADF, OM as numeric
+intake <- read.csv('Parameters/Diet.csv', colClasses = c(rep(c('factor', 'numeric'), each = 4), 'numeric'))
+digest <- read.csv('Parameters/Digestiblity.csv', colClasses = c(rep(c('factor', 'numeric'), each = 4), 'numeric'))
 
 
-# calculat the anova of NutrientIntake and digestbility using linear mixed effect model
-Nutrient = c('DM', 'OM', 'CP', 'NDF', 'ADF')
-NutrientIntake_anova  = list()
-NutrientIntake_posthoc = list()
-Digestibility_anova = list()
-Digestibility_posthoc = list()
-for (i in 1:length(Nutrient)){
-  Nutrient_index = Nutrient[i]
-  formula = as.formula(paste(Nutrient_index, '~ Period*Diet'))
-  NutrientIntake_lme = aov(formula, data = NutrientIntake)
-  Digestibility_lme = aov(formula, data = Digestibility)
+# calculat the anova of NutrientIntake and digestbility
+nutrient <- c('DM', 'OM', 'CP', 'NDF', 'ADF')
+intake_anova  <- list()
+intake_posthoc <- list()
+digest_anova <- list()
+digest_posthoc <- list()
 
-  # Store the anova result in NutrientIntake_anova
-  NutrientIntake_anova[[Nutrient_index]] = summary(NutrientIntake_lme)
-  Digestibility_anova[[Nutrient_index]] = summary(Digestibility_lme)
+for (i in 1:length(nutrient)){
+  nutrient_index <- nutrient[i]
+  formula <- as.formula(paste(nutrient_index, '~ Period*Diet'))
 
-  # Store the post hoc result
-  NutrientIntake_posthoc[[Nutrient_index]] = TukeyHSD(NutrientIntake_lme)[-3]
-  Digestibility_posthoc[[Nutrient_index]] = TukeyHSD(Digestibility_lme)[-3]
+  # do calculation
+  intake_index_anova <- aov(formula, data = intake)
+  digest_index_anova <- aov(formula, data = digest)
+
+  # store the anova result
+  intake_anova[[nutrient_index]] <- summary(intake_index_anova)
+  digest_anova[[nutrient_index]] <- summary(digest_index_anova)
+
+  # store the post hoc result
+  intake_posthoc[[nutrient_index]] <- TukeyHSD(intake_index_anova)[-3]
+  digest_posthoc[[nutrient_index]] <- TukeyHSD(digest_index_anova)[-3]
 }
 
 
 # calculate standard error of means for rumen fermentation parameters
-FermentationParameter = c('pH', 'NH', 'MCP', 'VFA')
-Fermentation_SE = list()
-for (i in 1:length(FermentationParameter)){
-  FermentationParameter_Index = FermentationParameter[i]
-  Fermentation_SE[[FermentationParameter_Index]] = summarySE(data = Fermentation,
-                                                             measurevar = FermentationParameter_Index,
-                                                             groupvars = c('Sequence', 'Day'),
-                                                             na.rm = T)
-}
-
-
-# plotting error bar for rumen fermentation parameters
-FermentationParameter_gerrorbar = list()
-for (i in 1:length(FermentationParameter)){
-  FermentationParameter_Index = FermentationParameter[i]
-  FermentationParameter_gerrorbar[[FermentationParameter_Index]] = gerrorbar(data = Fermentation_SE[[FermentationParameter_Index]],
-                                                                             xvars = 'Day',
-                                                                             yvars = FermentationParameter_Index,
-                                                                             se = 'se',
-                                                                             group = 'Sequence',
-                                                                             legendlabels = c('AH to CS to AH', 'CS to AH to CS'),
-                                                                             legendnames = 'Treatment Sequence',
-                                                                             xlab = 'Days After Transition',
-                                                                             ylimits = c(6,8),
-                                                                             legendjustification = c(1.1, -0.1),
-                                                                             legendposition = c(1, 0),
-                                                                             title = paste('Temporal varitaion of', FermentationParameter_Index, 'during forage transition'))
+ferment_variable <- c('pH', 'NH', 'MCP', 'VFA')
+ferment_variable_extend = c(ferment_variable, 'acetate_pre', 'propionate_pre', 'butyrate_pre', 'isobutyrate_pre', 'valerate_pre', 'isovalerate_pre')
+ferment_se <- list()
+for (i in 1:length(ferment_variable_extend)){
+  ferment_variable_index <- ferment_variable_extend[i]
+  ferment_se[[ferment_variable_index]] = summarySE(data = ferment,
+                                                   measurevar = ferment_variable_index,
+                                                   groupvars = c('Sequence', 'Day'),
+                                                   na.rm = T)
 }
 
 
 # we seperat the data according to two sequeneces, so we are able to do multicompasion between different time points within each sequence
-Fermentation_ACA = Fermentation[Fermentation$Sequence == 'ACA',]
-Fermentation_CAC = Fermentation[Fermentation$Sequence == 'CAC',]
-Fermentation_ACA$Day = as.factor(Fermentation_ACA$Day)    #set days as factors
-Fermentation_CAC$Day = as.factor(Fermentation_CAC$Day)
+ferment_ACA = ferment[ferment$Sequence == 'ACA',]
+ferment_CAC = ferment[ferment$Sequence == 'CAC',]
+ferment_ACA$Day = as.factor(ferment_ACA$Day)    #set days as factors
+ferment_CAC$Day = as.factor(ferment_CAC$Day)
 
 # initialize parameters to store the ANOVA result and post hoc tablet
-Fermentation_ACA_anova = list()
-Fermentation_CAC_anova = list()
-Fermentation_ACA_posthoc = list()
-Fermentation_CAC_posthoc = list()
+ferment_ACA_anova = list()
+ferment_CAC_anova = list()
+ferment_ACA_posthoc = list()
+ferment_CAC_posthoc = list()
 
-# do calculation
-for (i in 1:length(FermentationParameter)){
-  FermentationParameter_Index = FermentationParameter[i]
-  formula = as.formula(paste(FermentationParameter_Index, '~ Day'))
-  
-  Fermentation_ACA_anova[[FermentationParameter_Index]] <- aov(formula, data = Fermentation_ACA)
-  Fermentation_ACA_posthoc[[FermentationParameter_Index]] <- HSD.test(y = Fermentation_ACA_anova[[FermentationParameter_Index]], trt = 'Day', group = T)$groups
-  
-  Fermentation_CAC_anova[[FermentationParameter_Index]] <- aov(formula, data = Fermentation_CAC)
-  Fermentation_CAC_posthoc[[FermentationParameter_Index]] <- HSD.test(y = Fermentation_CAC_anova[[FermentationParameter_Index]], trt = 'Day', group = T)$groups
+# do ANOVA, post hoc calculation
+# posthoc result were labled with letters, setting 0.05 as significant thresholed
+for (i in 1:length(ferment_variable_extend)){
+  ferment_variable_index = ferment_variable_extend[i]
+  formula = as.formula(paste(ferment_variable_index, '~ Day'))
+
+  ferment_ACA_anova[[ferment_variable_index]] <- aov(formula, data = ferment_ACA)
+  ferment_ACA_posthoc[[ferment_variable_index]] <- HSD.test(y = ferment_ACA_anova[[ferment_variable_index]], trt = 'Day', group = T)$groups
+
+  ferment_CAC_anova[[ferment_variable_index]] <- aov(formula, data = ferment_CAC)
+  ferment_CAC_posthoc[[ferment_variable_index]] <- HSD.test(y = ferment_CAC_anova[[ferment_variable_index]], trt = 'Day', group = T)$groups
 }
 
 
+# plotting error bar for rumen fermentation parameters
+# pH plotting
+pH_plot <- gerrorbar(data = ferment_se[['pH']],
+                    xvars = 'Day', yvars = 'pH', se = 'se', group = 'Sequence',
+                    legendlabels = c('ACA sequence', 'CAC sequence'), legendnames = 'Treatment Seqeuences',
+                    ylab = 'pH', xlab = 'Time, d', ylimits = c(6,7.8)) +
+           geom_vline(color = 'grey40', linetype = 'dashed', xintercept = c(0.5, 14.5))
 
+# VFA plotting
+VFA_plot <- gerrorbar(data = ferment_se[['VFA']],
+                     xvars = 'Day', yvars = 'VFA', se = 'se', group = 'Sequence',
+                     legendlabels = c('ACA sequence', 'CAC sequence'), legendnames = 'Treatment Seqeuences',
+                     ylab = 'VFA, mM/L', xlab = 'Time, d', ylimits = c(-10,110)) +
+            geom_vline(color = 'grey40', linetype = 'dashed', xintercept = c(0.5, 14.5))
+
+# MCP plotting
+MCP_plot <- gerrorbar(data = ferment_se[['MCP']],
+                      xvars = 'Day', yvars = 'MCP', se = 'se', group = 'Sequence',
+                      legendlabels = c('ACA sequence', 'CAC sequence'), legendnames = 'Treatment Seqeuences',
+                      ylab = 'MCP, mg/dL', xlab = 'Time, d', ylimits = c(0,10)) +
+            geom_vline(color = 'grey40', linetype = 'dashed', xintercept = c(0.5, 14.5))
+
+# NH plotting
+NH_plot = gerrorbar(data = ferment_se[['NH']],
+                    xvars = 'Day', yvars = 'NH', se = 'se', group = 'Sequence',
+                    legendlabels = c('ACA sequence', 'CAC sequence'), legendnames = 'Treatment Sequences',
+                    ylab = 'NH3-N, mg/dL', xlab = 'Time, d', ylimits = c(0,25),
+                    legendposition = c(1,1), legendjustification = c(1,1))+
+          geom_vline(color = 'grey40', linetype = 'dashed', xintercept = c(0.5, 14.5))
+
+
+pdf(file = 'para.pdf', width = 14, height = 6)
+grid.arrange(pH_plot, VFA_plot, MCP_plot, NH_plot, nrow = 2)
+dev.off()

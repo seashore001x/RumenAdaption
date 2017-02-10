@@ -75,10 +75,10 @@ for (i in 1:length(ferment_variable_extend)){
   formula = as.formula(paste(ferment_variable_index, '~ Day'))
 
   ferment_ACA_anova[[ferment_variable_index]] <- aov(formula, data = ferment_ACA)
-  ferment_ACA_posthoc[[ferment_variable_index]] <- HSD.test(y = ferment_ACA_anova[[ferment_variable_index]], trt = 'Day', group = T)$groups
+  ferment_ACA_posthoc[[ferment_variable_index]] <- HSD.test(y = ferment_ACA_anova[[ferment_variable_index]], trt = 'Day', group = T, alpha = 0.05)$groups
 
   ferment_CAC_anova[[ferment_variable_index]] <- aov(formula, data = ferment_CAC)
-  ferment_CAC_posthoc[[ferment_variable_index]] <- HSD.test(y = ferment_CAC_anova[[ferment_variable_index]], trt = 'Day', group = T)$groups
+  ferment_CAC_posthoc[[ferment_variable_index]] <- HSD.test(y = ferment_CAC_anova[[ferment_variable_index]], trt = 'Day', group = T, alpha = 0.05)$groups
 }
 
 
@@ -94,25 +94,50 @@ pH_plot <- gerrorbar(data = ferment_se[['pH']],
 VFA_plot <- gerrorbar(data = ferment_se[['VFA']],
                      xvars = 'Day', yvars = 'VFA', se = 'se', group = 'Sequence',
                      legendlabels = c('ACA sequence', 'CAC sequence'), legendnames = 'Treatment Seqeuences',
-                     ylab = 'VFA, mM/L', xlab = 'Time, d', ylimits = c(-10,110)) +
+                     ylab = 'VFA, mM/L', xlab = 'Time, d', ylimits = c(0,120)) +
             geom_vline(color = 'grey40', linetype = 'dashed', xintercept = c(0.5, 14.5))
 
 # MCP plotting
 MCP_plot <- gerrorbar(data = ferment_se[['MCP']],
                       xvars = 'Day', yvars = 'MCP', se = 'se', group = 'Sequence',
                       legendlabels = c('ACA sequence', 'CAC sequence'), legendnames = 'Treatment Seqeuences',
-                      ylab = 'MCP, mg/dL', xlab = 'Time, d', ylimits = c(0,10)) +
+                      ylab = 'MCP, mg/dL', xlab = 'Time, d', ylimits = c(1.5,11.5)) +
             geom_vline(color = 'grey40', linetype = 'dashed', xintercept = c(0.5, 14.5))
 
 # NH plotting
 NH_plot = gerrorbar(data = ferment_se[['NH']],
                     xvars = 'Day', yvars = 'NH', se = 'se', group = 'Sequence',
                     legendlabels = c('ACA sequence', 'CAC sequence'), legendnames = 'Treatment Sequences',
-                    ylab = 'NH3-N, mg/dL', xlab = 'Time, d', ylimits = c(0,25),
+                    ylab = 'NH3-N, mg/dL', xlab = 'Time, d', ylimits = c(-5,25),
                     legendposition = c(1,1), legendjustification = c(1,1))+
           geom_vline(color = 'grey40', linetype = 'dashed', xintercept = c(0.5, 14.5))
 
 
-pdf(file = 'para.pdf', width = 14, height = 6)
-grid.arrange(pH_plot, VFA_plot, MCP_plot, NH_plot, nrow = 2)
+# annotating significance using letters
+annotation_ACA_y <- list('pH' = 7.5, 'VFA' = 100, 'MCP' = 10.5, 'NH' = 20)
+annotation_CAC_y <- list('pH' = 6.2, 'VFA' = 23, 'MCP' = 3, 'NH' = 0)
+ferment_plot <- list('pH' = pH_plot, 'VFA' = VFA_plot, 'MCP' = MCP_plot, 'NH' = NH_plot)
+
+for (i in 1:length(ferment_variable)){
+  ferment_variable_index <- ferment_variable[i]
+  
+  annotation_ACA <- ferment_ACA_posthoc[[ferment_variable_index]]$M
+  annotation_ACA_x <- as.numeric(levels(ferment_ACA_posthoc[[ferment_variable_index]]$trt))[ferment_ACA_posthoc[[ferment_variable_index]]$trt]
+  
+  annotation_CAC <- ferment_CAC_posthoc[[ferment_variable_index]]$M
+  annotation_CAC_x <- as.numeric(levels(ferment_CAC_posthoc[[ferment_variable_index]]$trt))[ferment_CAC_posthoc[[ferment_variable_index]]$trt]
+  
+  ferment_plot[[ferment_variable_index]] = ferment_plot[[ferment_variable_index]] + 
+                                           annotate(geom = 'text', label = annotation_ACA,
+                                                    x = annotation_ACA_x, y = annotation_ACA_y[[ferment_variable_index]],
+                                                    angle = 30, color = 'DarkRed')+
+                                           annotate(geom = 'text', label = annotation_CAC,
+                                                    x = annotation_CAC_x, y = annotation_CAC_y[[ferment_variable_index]],
+                                                    angle = 30, color = 'Turquoise4')
+}
+
+
+# export plotting result as pdf format
+pdf(file = 'para.pdf', width = 7, height = 12)
+grid.arrange(ferment_plot[['pH']], ferment_plot[['VFA']], ferment_plot[['MCP']], ferment_plot[['NH']], nrow = 4)
 dev.off()

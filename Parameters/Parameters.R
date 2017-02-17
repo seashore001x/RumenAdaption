@@ -1,4 +1,3 @@
-library('dplyr')
 library('agricolae')
 library('ggplot2')
 library('gridExtra')
@@ -45,7 +44,7 @@ for (i in 1:length(nutrient)){
 
 # calculate standard error of means for rumen fermentation parameters
 ferment_variable <- c('pH', 'NH', 'MCP', 'VFA')
-ferment_variable_extend = c(ferment_variable, 'acetate_pre', 'propionate_pre', 'butyrate_pre', 'isobutyrate_pre', 'valerate_pre', 'isovalerate_pre')
+ferment_variable_extend = c(ferment_variable, 'acetate_pre', 'propionate_pre', 'butyrate_pre', 'isobutyrate_pre', 'valerate_pre', 'isovalerate_pre', 'ap')
 ferment_se <- list()
 for (i in 1:length(ferment_variable_extend)){
   ferment_variable_index <- ferment_variable_extend[i]

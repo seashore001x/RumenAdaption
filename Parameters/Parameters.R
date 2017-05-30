@@ -1,6 +1,7 @@
 library('agricolae')
 library('ggplot2')
 library('gridExtra')
+library('car')
 source('../R_function/summarySE.R')
 source('../R_function/gerrorbar.R')
 
@@ -56,16 +57,31 @@ for (i in 1:length(ferment_variable_extend)){
 
 
 # we seperat the data according to two sequeneces, so we are able to do multicompasion between different time points within each sequence
-ferment_ACA = ferment[ferment$Sequence == 'ACA',]
-ferment_CAC = ferment[ferment$Sequence == 'CAC',]
-ferment_ACA$Day = as.factor(ferment_ACA$Day)    #set days as factors
-ferment_CAC$Day = as.factor(ferment_CAC$Day)
+ferment_ACA <- ferment[ferment$Sequence == 'ACA',]
+ferment_CAC <- ferment[ferment$Sequence == 'CAC',]
+ferment_ACA$Day <- as.factor(ferment_ACA$Day)    #set days as factors
+ferment_CAC$Day <- as.factor(ferment_CAC$Day)
+
+ferment_ACA_P2 <- ferment_ACA[ferment_ACA$Period != 'R',]
+ferment_ACA_P3 <- ferment_ACA[ferment_ACA$Period == 'R'|(ferment_ACA$Period == 'T'&ferment_ACA$Day == '14'),]
+ferment_CAC_P2 <- ferment_CAC[ferment_CAC$Period != 'R',]
+ferment_CAC_P3 <- ferment_CAC[ferment_CAC$Period == 'R'|(ferment_CAC$Period == 'T'&ferment_CAC$Day == '14'),]
+
 
 # initialize parameters to store the ANOVA result and post hoc tablet
 ferment_ACA_anova = list()
 ferment_CAC_anova = list()
 ferment_ACA_posthoc = list()
 ferment_CAC_posthoc = list()
+
+ferment_ACA_P2_anova = list()
+ferment_ACA_P3_anova = list()
+ferment_CAC_P2_anova = list()
+ferment_CAC_P3_anova = list()
+ferment_ACA_P2_posthoc = list()
+ferment_CAC_P2_posthoc = list()
+ferment_ACA_P3_posthoc = list()
+ferment_CAC_P3_posthoc = list()
 
 # do ANOVA, post hoc calculation
 # posthoc result were labled with letters, setting 0.05 as significant thresholed
@@ -74,11 +90,29 @@ for (i in 1:length(ferment_variable_extend)){
   formula = as.formula(paste(ferment_variable_index, '~ Day'))
 
   ferment_ACA_anova[[ferment_variable_index]] <- aov(formula, data = ferment_ACA)
-  ferment_ACA_posthoc[[ferment_variable_index]] <- HSD.test(y = ferment_ACA_anova[[ferment_variable_index]], trt = 'Day', group = T, alpha = 0.05)$groups
+  ferment_ACA_posthoc[[ferment_variable_index]] <- LSD.test(y = ferment_ACA_anova[[ferment_variable_index]], trt = 'Day', group = T, alpha = 0.05, p.adj = c("bonferroni"))$groups
 
   ferment_CAC_anova[[ferment_variable_index]] <- aov(formula, data = ferment_CAC)
-  ferment_CAC_posthoc[[ferment_variable_index]] <- HSD.test(y = ferment_CAC_anova[[ferment_variable_index]], trt = 'Day', group = T, alpha = 0.05)$groups
+  ferment_CAC_posthoc[[ferment_variable_index]] <- LSD.test(y = ferment_CAC_anova[[ferment_variable_index]], trt = 'Day', group = T, alpha = 0.05)$groups
 }
+
+for (i in 1:length(ferment_variable_extend)){
+  ferment_variable_index <- ferment_variable_extend[i]
+  formula <- as.formula(paste(ferment_variable_index, '~ Day'))
+  
+  ferment_ACA_P2_anova[[ferment_variable_index]] <-aov(formula, data = ferment_ACA_P2)
+  ferment_ACA_P2_posthoc[[ferment_variable_index]] <- waller.test(y = ferment_ACA_P2_anova[[ferment_variable_index]], trt = 'Day', group = T)$groups
+  
+  ferment_ACA_P3_anova[[ferment_variable_index]] <-aov(formula, data = ferment_ACA_P3)
+  ferment_ACA_P3_posthoc[[ferment_variable_index]] <- waller.test(y = ferment_ACA_P3_anova[[ferment_variable_index]], trt = 'Day', group = T)$groups
+  
+  ferment_CAC_P2_anova[[ferment_variable_index]] <-aov(formula, data = ferment_CAC_P2)
+  ferment_CAC_P2_posthoc[[ferment_variable_index]] <- waller.test(y = ferment_CAC_P2_anova[[ferment_variable_index]], trt = 'Day', group = T)$groups
+  
+  ferment_CAC_P3_anova[[ferment_variable_index]] <-aov(formula, data = ferment_CAC_P3)
+  ferment_CAC_P3_posthoc[[ferment_variable_index]] <- waller.test(y = ferment_CAC_P3_anova[[ferment_variable_index]], trt = 'Day', group = T)$groups
+}
+
 
 
 # plotting error bar for rumen fermentation parameters
@@ -136,7 +170,49 @@ for (i in 1:length(ferment_variable)){
 }
 
 
+annotation_ACA_P2_y <- list('pH' = 7.5, 'VFA' = 100, 'MCP' = 9.5, 'NH' = 20)
+annotation_CAC_P2_y <- list('pH' = 6.2, 'VFA' = 23, 'MCP' = 4, 'NH' = 0)
+annotation_ACA_P3_y <- list('pH' = 7.7, 'VFA' = 110, 'MCP' = 10.5, 'NH' = 22.5)
+annotation_CAC_P3_y <- list('pH' = 6, 'VFA' = 13, 'MCP' = 3, 'NH' = -2.5)
+ferment_plot <- list('pH' = pH_plot, 'VFA' = VFA_plot, 'MCP' = MCP_plot, 'NH' = NH_plot)
+
+for (i in 1:length(ferment_variable)){
+  ferment_variable_index <- ferment_variable[i]
+  
+  annotation_ACA_P2 <- ferment_ACA_P2_posthoc[[ferment_variable_index]]$M
+  annotation_ACA_P2_x <- as.numeric(levels(ferment_ACA_P2_posthoc[[ferment_variable_index]]$trt))[ferment_ACA_P2_posthoc[[ferment_variable_index]]$trt]
+  
+  annotation_CAC_P2 <- ferment_CAC_P2_posthoc[[ferment_variable_index]]$M
+  annotation_CAC_P2_x <- as.numeric(levels(ferment_CAC_P2_posthoc[[ferment_variable_index]]$trt))[ferment_CAC_P2_posthoc[[ferment_variable_index]]$trt]
+  
+  annotation_ACA_P3 <- ferment_ACA_P3_posthoc[[ferment_variable_index]]$M
+  annotation_ACA_P3_x <- as.numeric(levels(ferment_ACA_P3_posthoc[[ferment_variable_index]]$trt))[ferment_ACA_P3_posthoc[[ferment_variable_index]]$trt]
+  
+  annotation_CAC_P3 <- ferment_CAC_P3_posthoc[[ferment_variable_index]]$M
+  annotation_CAC_P3_x <- as.numeric(levels(ferment_CAC_P3_posthoc[[ferment_variable_index]]$trt))[ferment_CAC_P3_posthoc[[ferment_variable_index]]$trt]
+  
+  
+  ferment_plot[[ferment_variable_index]] = ferment_plot[[ferment_variable_index]] + 
+    annotate(geom = 'text', label = annotation_ACA_P2,
+             x = annotation_ACA_P2_x, y = annotation_ACA_P2_y[[ferment_variable_index]],
+             angle = 30, color = 'DarkRed')+
+    annotate(geom = 'text', label = annotation_CAC_P2,
+             x = annotation_CAC_P2_x, y = annotation_CAC_P2_y[[ferment_variable_index]],
+             angle = 30, color = 'Turquoise4')+
+    annotate(geom = 'text', label = annotation_ACA_P3,
+             x = annotation_ACA_P3_x, y = annotation_ACA_P3_y[[ferment_variable_index]],
+             angle = 30, color = 'DarkRed')+
+    annotate(geom = 'text', label = annotation_CAC_P3,
+             x = annotation_CAC_P3_x, y = annotation_CAC_P3_y[[ferment_variable_index]],
+             angle = 30, color = 'Turquoise4')
+}
+
+
 # export plotting result as pdf format
-pdf(file = 'para.pdf', width = 7, height = 12)
+pdf(file = 'para3.pdf', width = 7, height = 12)
 grid.arrange(ferment_plot[['pH']], ferment_plot[['VFA']], ferment_plot[['MCP']], ferment_plot[['NH']], nrow = 4)
 dev.off()
+
+
+# test
+tmp = lmer(MCP~Diet*Day+(1|Sequence)+(1|Period)+(1|Subject), data = ferment, REML = F)
